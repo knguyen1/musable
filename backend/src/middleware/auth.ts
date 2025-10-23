@@ -1,8 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import config from '../config/config';
-import UserModel, { UserWithoutPassword } from '../models/User';
-import { AppError } from './errorHandler';
+import config from '../config/config.js';
+import type { UserWithoutPassword } from '../models/User.js';
+import UserModel from '../models/User.js';
+import { AppError } from './errorHandler.js';
 
 export interface AuthRequest extends Request {
   user?: UserWithoutPassword;
@@ -19,12 +20,12 @@ export interface JwtPayload {
 
 export const authenticateToken = async (
   req: AuthRequest,
-  res: Response,
-  next: NextFunction
+  _res: Response,
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = authHeader?.split(' ')[1];
 
     if (!token) {
       throw new AppError('Access token required', 401);
@@ -39,10 +40,11 @@ export const authenticateToken = async (
 
     req.user = user;
     next();
-  } catch (error: any) {
-    if (error.name === 'JsonWebTokenError') {
+  } catch (error: unknown) {
+    const err = error as { name?: string };
+    if (err.name === 'JsonWebTokenError') {
       next(new AppError('Invalid token', 401));
-    } else if (error.name === 'TokenExpiredError') {
+    } else if (err.name === 'TokenExpiredError') {
       next(new AppError('Token expired', 401));
     } else {
       next(error);
@@ -52,8 +54,8 @@ export const authenticateToken = async (
 
 export const requireAdmin = async (
   req: AuthRequest,
-  res: Response,
-  next: NextFunction
+  _res: Response,
+  next: NextFunction,
 ): Promise<void> => {
   if (!req.user) {
     return next(new AppError('Authentication required', 401));
@@ -68,24 +70,24 @@ export const requireAdmin = async (
 
 export const optionalAuth = async (
   req: AuthRequest,
-  res: Response,
-  next: NextFunction
+  _res: Response,
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = authHeader?.split(' ')[1];
 
     if (token) {
       const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
       const user = await UserModel.findById(decoded.id);
-      
+
       if (user) {
         req.user = user;
       }
     }
 
     next();
-  } catch (error) {
+  } catch (_error) {
     next();
   }
 };
@@ -95,11 +97,11 @@ export const generateToken = (user: UserWithoutPassword): string => {
     id: user.id,
     username: user.username,
     email: user.email,
-    is_admin: user.is_admin
+    is_admin: user.is_admin,
   };
 
   return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn as string
+    expiresIn: config.jwtExpiresIn as string,
   });
 };
 

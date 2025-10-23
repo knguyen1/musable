@@ -1,25 +1,35 @@
-import { Request, Response } from 'express';
-import SongModel from '../models/Song';
-import ArtistModel from '../models/Artist';
-import AlbumModel from '../models/Album';
-import AlbumFollowsModel from '../models/AlbumFollows';
-import libraryScanner from '../services/libraryScanner';
-import ytMusicService from '../services/ytMusicService';
-import { AuthRequest } from '../middleware/auth';
-import { AppError, asyncHandler } from '../middleware/errorHandler';
+import type { Request, Response } from 'express';
+import type { AuthRequest } from '../middleware/auth.js';
+import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import AlbumModel from '../models/Album.js';
+import AlbumFollowsModel from '../models/AlbumFollows.js';
+import ArtistModel from '../models/Artist.js';
+import SongModel from '../models/Song.js';
+import libraryScanner from '../services/libraryScanner.js';
+import ytMusicService from '../services/ytMusicService.js';
 
 export const getAllSongs = asyncHandler(async (req: Request, res: Response) => {
-  const { search, artist, album, genre, limit = 50, offset = 0, includeYTMusic = 'true' } = req.query;
+  const {
+    search,
+    artist,
+    album,
+    genre,
+    limit = 50,
+    offset = 0,
+    includeYTMusic = 'true',
+  } = req.query;
 
-  let songs;
-  let ytMusicResults = [];
+  let songs: unknown[] = [];
+  let ytMusicResults: unknown[] = [];
 
   if (search) {
     // Get local songs
     songs = await SongModel.searchSongs(search as string);
-    
+
     // Also search YouTube Music if enabled
-    console.log(`🎵 Search query: "${search}", includeYTMusic: "${includeYTMusic}"`);
+    console.log(
+      `🎵 Search query: "${search}", includeYTMusic: "${includeYTMusic}"`,
+    );
     if (includeYTMusic === 'true') {
       try {
         console.log('🎵 Searching YouTube Music...');
@@ -33,16 +43,16 @@ export const getAllSongs = asyncHandler(async (req: Request, res: Response) => {
   } else if (genre) {
     songs = await SongModel.getSongsByGenre(genre as string);
   } else if (artist) {
-    songs = await SongModel.getSongsByArtist(parseInt(artist as string));
+    songs = await SongModel.getSongsByArtist(parseInt(artist as string, 10));
   } else if (album) {
-    songs = await SongModel.getSongsByAlbum(parseInt(album as string));
+    songs = await SongModel.getSongsByAlbum(parseInt(album as string, 10));
   } else {
     songs = await SongModel.getAllWithDetails();
   }
 
-  const limitNum = parseInt(limit as string);
-  const offsetNum = parseInt(offset as string);
-  
+  const limitNum = parseInt(limit as string, 10);
+  const offsetNum = parseInt(offset as string, 10);
+
   const paginatedSongs = songs.slice(offsetNum, offsetNum + limitNum);
 
   res.json({
@@ -53,57 +63,61 @@ export const getAllSongs = asyncHandler(async (req: Request, res: Response) => {
       total: songs.length,
       limit: limitNum,
       offset: offsetNum,
-      hasYTMusicResults: ytMusicResults.length > 0
-    }
+      hasYTMusicResults: ytMusicResults.length > 0,
+    },
   });
 });
 
 export const getSong = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  
-  const song = await SongModel.findWithDetails(parseInt(id));
+
+  const song = await SongModel.findWithDetails(parseInt(id, 10));
   if (!song) {
     throw new AppError('Song not found', 404);
   }
 
   res.json({
     success: true,
-    data: { song }
+    data: { song },
   });
 });
 
-export const getRandomSongs = asyncHandler(async (req: Request, res: Response) => {
-  const { limit = 50 } = req.query;
-  
-  const songs = await SongModel.getRandomSongs(parseInt(limit as string));
+export const getRandomSongs = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { limit = 50 } = req.query;
 
-  res.json({
-    success: true,
-    data: { songs }
-  });
-});
+    const songs = await SongModel.getRandomSongs(parseInt(limit as string, 10));
 
-export const getAllArtists = asyncHandler(async (req: Request, res: Response) => {
-  const { search } = req.query;
+    res.json({
+      success: true,
+      data: { songs },
+    });
+  },
+);
 
-  let artists;
-  
-  if (search) {
-    artists = await ArtistModel.search(search as string);
-  } else {
-    artists = await ArtistModel.getAllWithStats();
-  }
+export const getAllArtists = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { search } = req.query;
 
-  res.json({
-    success: true,
-    data: { artists }
-  });
-});
+    let artists: unknown[];
+
+    if (search) {
+      artists = await ArtistModel.search(search as string);
+    } else {
+      artists = await ArtistModel.getAllWithStats();
+    }
+
+    res.json({
+      success: true,
+      data: { artists },
+    });
+  },
+);
 
 export const getArtist = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  
-  const artist = await ArtistModel.findById(parseInt(id));
+
+  const artist = await ArtistModel.findById(parseInt(id, 10));
   if (!artist) {
     throw new AppError('Artist not found', 404);
   }
@@ -116,34 +130,38 @@ export const getArtist = asyncHandler(async (req: Request, res: Response) => {
     data: {
       artist,
       songs,
-      albums
+      albums,
+    },
+  });
+});
+
+export const getAllAlbums = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { search, artist } = req.query;
+
+    let albums: unknown[];
+
+    if (search) {
+      albums = await AlbumModel.search(search as string);
+    } else if (artist) {
+      albums = await AlbumModel.getAlbumsByArtist(
+        parseInt(artist as string, 10),
+      );
+    } else {
+      albums = await AlbumModel.getAllWithDetails();
     }
-  });
-});
 
-export const getAllAlbums = asyncHandler(async (req: Request, res: Response) => {
-  const { search, artist } = req.query;
-
-  let albums;
-
-  if (search) {
-    albums = await AlbumModel.search(search as string);
-  } else if (artist) {
-    albums = await AlbumModel.getAlbumsByArtist(parseInt(artist as string));
-  } else {
-    albums = await AlbumModel.getAllWithDetails();
-  }
-
-  res.json({
-    success: true,
-    data: { albums }
-  });
-});
+    res.json({
+      success: true,
+      data: { albums },
+    });
+  },
+);
 
 export const getAlbum = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  
-  const album = await AlbumModel.findWithDetails(parseInt(id));
+
+  const album = await AlbumModel.findWithDetails(parseInt(id, 10));
   if (!album) {
     throw new AppError('Album not found', 404);
   }
@@ -154,161 +172,210 @@ export const getAlbum = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     data: {
       album,
-      songs
-    }
+      songs,
+    },
   });
 });
 
-export const getRecentAlbums = asyncHandler(async (req: Request, res: Response) => {
-  const { limit = 20 } = req.query;
-  
-  const albums = await AlbumModel.getRecentAlbums(parseInt(limit as string));
+export const getRecentAlbums = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { limit = 20 } = req.query;
 
-  res.json({
-    success: true,
-    data: { albums }
-  });
-});
+    const albums = await AlbumModel.getRecentAlbums(
+      parseInt(limit as string, 10),
+    );
 
-export const getGenres = asyncHandler(async (req: Request, res: Response) => {
+    res.json({
+      success: true,
+      data: { albums },
+    });
+  },
+);
+
+export const getGenres = asyncHandler(async (_req: Request, res: Response) => {
   const genres = await SongModel.getGenres();
 
   res.json({
     success: true,
-    data: { genres }
+    data: { genres },
   });
 });
 
-export const getLibraryStats = asyncHandler(async (req: Request, res: Response) => {
-  const stats = await libraryScanner.getLibraryStats();
+export const getLibraryStats = asyncHandler(
+  async (_req: Request, res: Response) => {
+    const stats = await libraryScanner.getLibraryStats();
 
-  res.json({
-    success: true,
-    data: { stats }
-  });
-});
+    res.json({
+      success: true,
+      data: { stats },
+    });
+  },
+);
 
-export const startLibraryScan = asyncHandler(async (req: AuthRequest, res: Response) => {
-  if (!req.user?.is_admin) {
-    throw new AppError('Admin access required', 403);
-  }
-
-  const { paths } = req.body;
-
-  if (libraryScanner.isCurrentlyScanning()) {
-    throw new AppError('Library scan already in progress', 409);
-  }
-
-  const scanId = await libraryScanner.startScan(paths);
-
-  res.json({
-    success: true,
-    data: {
-      scanId,
-      message: 'Library scan started'
+export const startLibraryScan = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.user?.is_admin) {
+      throw new AppError('Admin access required', 403);
     }
-  });
-});
 
-export const getScanStatus = asyncHandler(async (req: Request, res: Response) => {
-  const currentScan = libraryScanner.getCurrentScan();
-  const scanHistory = await libraryScanner.getScanHistory();
+    const { paths } = req.body;
 
-  res.json({
-    success: true,
-    data: {
-      currentScan,
-      history: scanHistory,
-      isScanning: libraryScanner.isCurrentlyScanning()
+    if (libraryScanner.isCurrentlyScanning()) {
+      throw new AppError('Library scan already in progress', 409);
     }
-  });
-});
+
+    const scanId = await libraryScanner.startScan(paths);
+
+    res.json({
+      success: true,
+      data: {
+        scanId,
+        message: 'Library scan started',
+      },
+    });
+  },
+);
+
+export const getScanStatus = asyncHandler(
+  async (_req: Request, res: Response) => {
+    const currentScan = libraryScanner.getCurrentScan();
+    const scanHistory = await libraryScanner.getScanHistory();
+
+    res.json({
+      success: true,
+      data: {
+        currentScan,
+        history: scanHistory,
+        isScanning: libraryScanner.isCurrentlyScanning(),
+      },
+    });
+  },
+);
 
 // Album Follow endpoints
-export const followAlbum = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const albumId = parseInt(id);
-  const userId = req.user!.id;
-
-  const album = await AlbumModel.findById(albumId);
-  if (!album) {
-    throw new AppError('Album not found', 404);
-  }
-
-  await AlbumFollowsModel.followAlbum(userId, albumId);
-
-  res.json({
-    success: true,
-    data: { message: 'Album followed successfully' }
-  });
-});
-
-export const unfollowAlbum = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const albumId = parseInt(id);
-  const userId = req.user!.id;
-
-  await AlbumFollowsModel.unfollowAlbum(userId, albumId);
-
-  res.json({
-    success: true,
-    data: { message: 'Album unfollowed successfully' }
-  });
-});
-
-export const toggleAlbumFollow = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const albumId = parseInt(id);
-  const userId = req.user!.id;
-
-  const album = await AlbumModel.findById(albumId);
-  if (!album) {
-    throw new AppError('Album not found', 404);
-  }
-
-  const result = await AlbumFollowsModel.toggleAlbumFollow(userId, albumId);
-
-  res.json({
-    success: true,
-    data: { 
-      isFollowing: result.isFollowing,
-      message: result.isFollowing ? 'Album followed successfully' : 'Album unfollowed successfully'
+export const followAlbum = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const albumId = parseInt(id, 10);
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
     }
-  });
-});
+    const userId = req.user.id;
 
-export const getFollowedAlbums = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.user!.id;
-  const albums = await AlbumFollowsModel.getUserFollowedAlbums(userId);
+    const album = await AlbumModel.findById(albumId);
+    if (!album) {
+      throw new AppError('Album not found', 404);
+    }
 
-  res.json({
-    success: true,
-    data: { albums }
-  });
-});
+    await AlbumFollowsModel.followAlbum(userId, albumId);
 
-export const getAlbumsWithFollowStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.user!.id;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const offset = parseInt(req.query.offset as string) || 0;
+    res.json({
+      success: true,
+      data: { message: 'Album followed successfully' },
+    });
+  },
+);
 
-  const albums = await AlbumFollowsModel.getAlbumsWithFollowStatus(userId, limit, offset);
+export const unfollowAlbum = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const albumId = parseInt(id, 10);
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
+    }
+    const userId = req.user.id;
 
-  res.json({
-    success: true,
-    data: { albums }
-  });
-});
+    await AlbumFollowsModel.unfollowAlbum(userId, albumId);
 
-export const getAlbumFollowStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const albumId = parseInt(id);
-  const userId = req.user!.id;
+    res.json({
+      success: true,
+      data: { message: 'Album unfollowed successfully' },
+    });
+  },
+);
 
-  const isFollowing = await AlbumFollowsModel.isFollowingAlbum(userId, albumId);
+export const toggleAlbumFollow = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const albumId = parseInt(id, 10);
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
+    }
+    const userId = req.user.id;
 
-  res.json({
-    success: true,
-    data: { isFollowing }
-  });
-});
+    const album = await AlbumModel.findById(albumId);
+    if (!album) {
+      throw new AppError('Album not found', 404);
+    }
+
+    const result = await AlbumFollowsModel.toggleAlbumFollow(userId, albumId);
+
+    res.json({
+      success: true,
+      data: {
+        isFollowing: result.isFollowing,
+        message: result.isFollowing
+          ? 'Album followed successfully'
+          : 'Album unfollowed successfully',
+      },
+    });
+  },
+);
+
+export const getFollowedAlbums = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
+    }
+    const userId = req.user.id;
+    const albums = await AlbumFollowsModel.getUserFollowedAlbums(userId);
+
+    res.json({
+      success: true,
+      data: { albums },
+    });
+  },
+);
+
+export const getAlbumsWithFollowStatus = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
+    }
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+
+    const albums = await AlbumFollowsModel.getAlbumsWithFollowStatus(
+      userId,
+      limit,
+      offset,
+    );
+
+    res.json({
+      success: true,
+      data: { albums },
+    });
+  },
+);
+
+export const getAlbumFollowStatus = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const albumId = parseInt(id, 10);
+    if (!req.user || typeof req.user.id !== 'number') {
+      throw new AppError('Unauthorized', 401);
+    }
+    const userId = req.user.id;
+
+    const isFollowing = await AlbumFollowsModel.isFollowingAlbum(
+      userId,
+      albumId,
+    );
+
+    res.json({
+      success: true,
+      data: { isFollowing },
+    });
+  },
+);

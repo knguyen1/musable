@@ -1,5 +1,5 @@
-import { randomBytes } from 'crypto';
-import Database from '../config/database';
+import { randomBytes } from 'node:crypto';
+import Database from '../config/database.js';
 
 export interface ShareToken {
   id: number;
@@ -30,17 +30,25 @@ class ShareTokenModel {
 
   async create(data: CreateShareTokenData): Promise<ShareToken> {
     const token = this.generateToken();
-    const expiresAt = data.expires_in_hours 
-      ? new Date(Date.now() + data.expires_in_hours * 60 * 60 * 1000).toISOString()
+    const expiresAt = data.expires_in_hours
+      ? new Date(
+          Date.now() + data.expires_in_hours * 60 * 60 * 1000,
+        ).toISOString()
       : null;
 
     const result = await this.db.run(
       `INSERT INTO share_tokens (token, song_id, created_by, max_access, expires_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [token, data.song_id, data.created_by, data.max_access || null, expiresAt]
+      [
+        token,
+        data.song_id,
+        data.created_by,
+        data.max_access || null,
+        expiresAt,
+      ],
     );
 
-    const shareToken = await this.findById(result.lastID!);
+    const shareToken = await this.findById(result.lastID as number);
     if (!shareToken) {
       throw new Error('Failed to create share token');
     }
@@ -51,20 +59,31 @@ class ShareTokenModel {
   async findById(id: number): Promise<ShareToken | null> {
     return await this.db.get<ShareToken>(
       'SELECT * FROM share_tokens WHERE id = ?',
-      [id]
+      [id],
     );
   }
 
   async findByToken(token: string): Promise<ShareToken | null> {
     return await this.db.get<ShareToken>(
       'SELECT * FROM share_tokens WHERE token = ?',
-      [token]
+      [token],
     );
   }
 
-  async validateAndIncrementAccess(token: string): Promise<{ valid: boolean; shareToken?: ShareToken; song?: any }> {
+  async validateAndIncrementAccess(token: string): Promise<{
+    valid: boolean;
+    shareToken?: ShareToken;
+    song?: {
+      id: number;
+      title: string;
+      artist_name: string;
+      album_title: string | null;
+      artwork_path: string | null;
+      duration?: number | null;
+    };
+  }> {
     const shareToken = await this.findByToken(token);
-    
+
     if (!shareToken) {
       return { valid: false };
     }
@@ -75,18 +94,28 @@ class ShareTokenModel {
     }
 
     // Check max access limit
-    if (shareToken.max_access && shareToken.access_count >= shareToken.max_access) {
+    if (
+      shareToken.max_access &&
+      shareToken.access_count >= shareToken.max_access
+    ) {
       return { valid: false };
     }
 
     // Get song details
-    const song = await this.db.get(
+    const song = await this.db.get<{
+      id: number;
+      title: string;
+      artist_name: string;
+      album_title: string | null;
+      artwork_path: string | null;
+      duration?: number | null;
+    }>(
       `SELECT s.*, a.name as artist_name, al.title as album_title, al.artwork_path
        FROM songs s
        JOIN artists a ON s.artist_id = a.id
        LEFT JOIN albums al ON s.album_id = al.id
        WHERE s.id = ?`,
-      [shareToken.song_id]
+      [shareToken.song_id],
     );
 
     if (!song) {
@@ -96,23 +125,23 @@ class ShareTokenModel {
     // Increment access count and update last accessed
     await this.db.run(
       'UPDATE share_tokens SET access_count = access_count + 1, last_accessed = CURRENT_TIMESTAMP WHERE id = ?',
-      [shareToken.id]
+      [shareToken.id],
     );
 
-    return { 
-      valid: true, 
+    return {
+      valid: true,
       shareToken: {
         ...shareToken,
-        access_count: shareToken.access_count + 1
+        access_count: shareToken.access_count + 1,
       },
-      song 
+      song,
     };
   }
 
   async findBySongId(songId: number): Promise<ShareToken[]> {
     return await this.db.query<ShareToken>(
       'SELECT * FROM share_tokens WHERE song_id = ? ORDER BY created_at DESC',
-      [songId]
+      [songId],
     );
   }
 
@@ -124,22 +153,21 @@ class ShareTokenModel {
        JOIN artists a ON s.artist_id = a.id
        WHERE st.created_by = ?
        ORDER BY st.created_at DESC`,
-      [userId]
+      [userId],
     );
   }
 
   async delete(id: number): Promise<boolean> {
-    const result = await this.db.run(
-      'DELETE FROM share_tokens WHERE id = ?',
-      [id]
-    );
+    const result = await this.db.run('DELETE FROM share_tokens WHERE id = ?', [
+      id,
+    ]);
 
     return result.changes > 0;
   }
 
   async cleanupExpired(): Promise<number> {
     const result = await this.db.run(
-      'DELETE FROM share_tokens WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP'
+      'DELETE FROM share_tokens WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP',
     );
 
     return result.changes;

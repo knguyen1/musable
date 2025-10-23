@@ -1,25 +1,28 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
-import { FavoriteModel } from '../models/Favorite';
-import logger from '../utils/logger';
+import type { Response } from 'express';
+import type { AuthRequest } from '../middleware/auth.js';
+import { FavoriteModel } from '../models/Favorite.js';
+import logger from '../utils/logger.js';
 
-export const getFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getFavorites = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = req.user?.id;
-    
+
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
     const favorites = await FavoriteModel.getUserFavorites(userId);
-    
+
     res.json({
       success: true,
       data: {
         songs: favorites,
-        count: favorites.length
-      }
+        count: favorites.length,
+      },
     });
   } catch (error) {
     logger.error('Error getting favorites:', error);
@@ -27,30 +30,35 @@ export const getFavorites = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
-export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<void> => {
+export const toggleFavorite = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const songId = parseInt(req.params.songId);
-    
+    const songId = parseInt(req.params.songId, 10);
+
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
-    if (!songId || isNaN(songId)) {
+    if (!songId || Number.isNaN(songId)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
 
     const result = await FavoriteModel.toggleFavorite(userId, songId);
-    
+
     res.json({
       success: true,
       data: {
         songId,
         isFavorited: result.isFavorited,
-        message: result.isFavorited ? 'Added to favorites' : 'Removed from favorites'
-      }
+        message: result.isFavorited
+          ? 'Added to favorites'
+          : 'Removed from favorites',
+      },
     });
   } catch (error) {
     logger.error('Error toggling favorite:', error);
@@ -58,29 +66,32 @@ export const toggleFavorite = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const checkFavoriteStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+export const checkFavoriteStatus = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const songId = parseInt(req.params.songId);
-    
+    const songId = parseInt(req.params.songId, 10);
+
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
-    if (!songId || isNaN(songId)) {
+    if (!songId || Number.isNaN(songId)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
 
     const isFavorited = await FavoriteModel.isFavorited(userId, songId);
-    
+
     res.json({
       success: true,
       data: {
         songId,
-        isFavorited
-      }
+        isFavorited,
+      },
     });
   } catch (error) {
     logger.error('Error checking favorite status:', error);
@@ -88,30 +99,33 @@ export const checkFavoriteStatus = async (req: AuthRequest, res: Response): Prom
   }
 };
 
-export const addToFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
+export const addToFavorites = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const songId = parseInt(req.params.songId);
-    
+    const songId = parseInt(req.params.songId, 10);
+
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
-    if (!songId || isNaN(songId)) {
+    if (!songId || Number.isNaN(songId)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
 
     await FavoriteModel.addToFavorites(userId, songId);
-    
+
     res.json({
       success: true,
       data: {
         songId,
         isFavorited: true,
-        message: 'Added to favorites'
-      }
+        message: 'Added to favorites',
+      },
     });
   } catch (error) {
     logger.error('Error adding to favorites:', error);
@@ -119,30 +133,33 @@ export const addToFavorites = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const removeFromFavorites = async (req: AuthRequest, res: Response): Promise<void> => {
+export const removeFromFavorites = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const songId = parseInt(req.params.songId);
-    
+    const songId = parseInt(req.params.songId, 10);
+
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
-    if (!songId || isNaN(songId)) {
+    if (!songId || Number.isNaN(songId)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
 
     await FavoriteModel.removeFromFavorites(userId, songId);
-    
+
     res.json({
       success: true,
       data: {
         songId,
         isFavorited: false,
-        message: 'Removed from favorites'
-      }
+        message: 'Removed from favorites',
+      },
     });
   } catch (error) {
     logger.error('Error removing from favorites:', error);

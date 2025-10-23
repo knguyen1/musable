@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger';
+import type { NextFunction, Request, Response } from 'express';
+import logger from '../utils/logger.js';
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -23,7 +23,7 @@ export const errorHandler = (
   error: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction,
 ): void => {
   const { statusCode = 500, message } = error;
 
@@ -32,7 +32,7 @@ export const errorHandler = (
     method: req.method,
     ip: req.ip,
     userAgent: req.get('user-agent'),
-    stack: error.stack
+    stack: error.stack,
   });
 
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -40,15 +40,20 @@ export const errorHandler = (
   res.status(statusCode).json({
     success: false,
     error: {
-      message: statusCode === 500 && !isDevelopment ? 'Internal Server Error' : message,
+      message:
+        statusCode === 500 && !isDevelopment
+          ? 'Internal Server Error'
+          : message,
       ...(isDevelopment && { stack: error.stack }),
       timestamp: new Date().toISOString(),
-      path: req.url
-    }
+      path: req.url,
+    },
   });
 };
 
-export const asyncHandler = (fn: Function) => {
+export const asyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => unknown,
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
